@@ -1,0 +1,13 @@
+# Ignore build directories
+bin/
+obj/
+
+# Ignore user-specific files
+
+# Ignore documentation
+*.md
+
+# Ignore any files related to development tools
+.vscode/
+.idea/
+*.tmp

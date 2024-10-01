@@ -1,0 +1,95 @@
+name: .NET 8 CI/CD Pipeline
+
+# Trigger the workflow on every push to the main branch
+on:
+  # push:
+  #   branches:
+  #     - main
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Setup .NET environment with .NET 8.0
+      - name: Setup .NET 8.0
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: "8.0.x"
+
+      # Step 3: Cache NuGet packages to avoid downloading them every time
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      # Step 4: Restore project dependencies
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: ./E-Commerce/Ecommerce.Infrastructure
+
+      # Step 5: Run unit tests (before build)
+      # - name: Run Unit Tests
+      #   run: dotnet test --logger trx --results-directory TestResults
+
+      # # Step 6: Upload test results as artifacts (always, even if tests fail)
+      # - name: Upload Test Results
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: test-results
+      #     path: TestResults
+      #   if: ${{ always() }}
+
+      # Step 7: Build the application (only if tests pass)
+      - name: Build Application
+        run: dotnet build --configuration Release --no-restore
+        working-directory: ./E-Commerce/Ecommerce.Infrastructure
+
+        if: success()
+
+      # Step 8: Publish the build output as an artifact
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ./E-Commerce/Ecommerce.Infrastructure/bin/Release
+        if: success()
+
+  release-to-azure:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Download the previously built artifact
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ./bin/Release
+
+      # Step 2: Login to Azure using service principal credentials (updated to use azure/login@v2.1 with OIDC)
+      # - name: "Login to Azure"
+      #   uses: azure/login@v2.1
+      #   with:
+      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Step 3: Deploy the built application to Azure Web App
+      - name: "Deploy to Azure Web App"
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: Dorpa
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./bin/Release
+
+      # Optional: Notify deployment success
+      - name: "Post Deployment Notification"
+        run: echo "Deployment to Azure Web App successful for .NET 8."

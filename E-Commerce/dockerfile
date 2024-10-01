@@ -1,0 +1,38 @@
+# Use the official .NET SDK image for building the application
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+# Set the working directory for the build
+WORKDIR /
+
+# Copy the solution file first
+COPY ./*.sln .
+
+# Copy each project file into their respective directories
+COPY ./Ecommerce.Model/Ecommerce.Model.csproj Ecommerce.Model/
+COPY ./Ecommerce.Service/Ecommerce.Service.csproj Ecommerce.Service/
+COPY ./Ecommerce.Controller/Ecommerce.Controller.csproj Ecommerce.Controller/
+COPY ./Ecommerce.Infrastructure/Ecommerce.Infrastructure.csproj Ecommerce.Infrastructure/
+
+# Restore all dependencies from the project files
+RUN dotnet restore
+
+# Copy the rest of the application code into the working directory
+COPY . .
+
+# Publish the application to the /app directory
+RUN dotnet publish -c Release -o /app
+
+# Create the final runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+
+# Set the working directory in the runtime image
+WORKDIR /app
+
+# Copy the published output from the build stage
+COPY --from=build /app .
+
+# Expose the port on which the app will run
+EXPOSE 5000
+
+# Specify the command to run the application
+ENTRYPOINT ["dotnet", "Ecommerce.Infrastructure.dll"]
